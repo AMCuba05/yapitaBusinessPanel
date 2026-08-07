@@ -7,19 +7,27 @@ import Rewards from "./pages/Rewards";
 import Customers from "./pages/Customers";
 import Cashiers from "./pages/Cashiers";
 import Layout from "./components/Layout";
+import Login from "./auth/Login";
+import ProtectedRoute from "./auth/ProtectedRoute";
 
 export const router = createBrowserRouter([
+  { path: "/login", Component: Login },
   {
-    path: "/",
-    Component: Layout,
+    Component: ProtectedRoute,
     children: [
-      { index: true, Component: Dashboard },
-      { path: "config", Component: BusinessConfig },
-      { path: "cards", Component: Cards },
-      { path: "promotions", Component: Promotions },
-      { path: "rewards", Component: Rewards },
-      { path: "customers", Component: Customers },
-      { path: "cashiers", Component: Cashiers },
+      {
+        path: "/",
+        Component: Layout,
+        children: [
+          { index: true, Component: Dashboard },
+          { path: "config", Component: BusinessConfig },
+          { path: "cards", Component: Cards },
+          { path: "promotions", Component: Promotions },
+          { path: "rewards", Component: Rewards },
+          { path: "customers", Component: Customers },
+          { path: "cashiers", Component: Cashiers },
+        ],
+      },
     ],
   },
 ]);

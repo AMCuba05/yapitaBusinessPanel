@@ -8,9 +8,11 @@ import {
   Users,
   UserCheck,
   Menu,
-  X
+  X,
+  LogOut,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../auth/AuthProvider';
 
 const navigation = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -25,6 +27,7 @@ const navigation = [
 export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile, assignment, selectAssignment, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -91,6 +94,32 @@ export default function Layout() {
               );
             })}
           </nav>
+          <div className="border-t p-4 space-y-3">
+            {profile && profile.assignments.length > 1 && (
+              <select
+                value={assignment?.id ?? ''}
+                onChange={(event) => selectAssignment(event.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              >
+                {profile.assignments.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.business.displayName}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div>
+              <p className="text-sm text-gray-900 truncate">{profile?.fullName}</p>
+              <p className="text-xs text-gray-500 truncate">{profile?.email}</p>
+            </div>
+            <button
+              onClick={() => void logout()}
+              className="w-full flex items-center gap-2 text-sm text-gray-600 hover:text-red-600"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </aside>
 

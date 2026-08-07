@@ -1,314 +1,60 @@
-import { useState } from 'react';
-import { Search, Filter, Download, Mail, Phone, Star, TrendingUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Download, Mail, Phone, Search, Star, TrendingUp } from 'lucide-react';
+import { useBusinessResource } from '../lib/useBusinessResource';
 
 interface Customer {
   id: string;
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   points: number;
   stamps: number;
   visits: number;
-  totalSpent: number;
-  joinDate: string;
-  lastVisit: string;
-  status: 'active' | 'inactive' | 'vip';
+  totalSpentMinor: number;
+  joinedAt: string;
+  lastVisitAt: string | null;
+  status: string;
+  tier: string;
 }
 
-const mockCustomers: Customer[] = [
-  {
-    id: '1',
-    name: 'María González',
-    email: 'maria.gonzalez@email.com',
-    phone: '+1 234 567 8900',
-    points: 450,
-    stamps: 8,
-    visits: 23,
-    totalSpent: 1250,
-    joinDate: '2025-10-15',
-    lastVisit: '2026-03-30',
-    status: 'vip',
-  },
-  {
-    id: '2',
-    name: 'Carlos Ruiz',
-    email: 'carlos.ruiz@email.com',
-    phone: '+1 234 567 8901',
-    points: 320,
-    stamps: 5,
-    visits: 18,
-    totalSpent: 980,
-    joinDate: '2025-11-20',
-    lastVisit: '2026-03-29',
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Ana López',
-    email: 'ana.lopez@email.com',
-    phone: '+1 234 567 8902',
-    points: 150,
-    stamps: 3,
-    visits: 12,
-    totalSpent: 560,
-    joinDate: '2026-01-10',
-    lastVisit: '2026-03-28',
-    status: 'active',
-  },
-  {
-    id: '4',
-    name: 'Pedro Sánchez',
-    email: 'pedro.sanchez@email.com',
-    phone: '+1 234 567 8903',
-    points: 80,
-    stamps: 2,
-    visits: 5,
-    totalSpent: 320,
-    joinDate: '2026-02-14',
-    lastVisit: '2026-03-25',
-    status: 'active',
-  },
-  {
-    id: '5',
-    name: 'Laura Martínez',
-    email: 'laura.martinez@email.com',
-    phone: '+1 234 567 8904',
-    points: 600,
-    stamps: 10,
-    visits: 35,
-    totalSpent: 2100,
-    joinDate: '2025-09-05',
-    lastVisit: '2026-03-31',
-    status: 'vip',
-  },
-  {
-    id: '6',
-    name: 'Diego Fernández',
-    email: 'diego.fernandez@email.com',
-    phone: '+1 234 567 8905',
-    points: 45,
-    stamps: 1,
-    visits: 3,
-    totalSpent: 180,
-    joinDate: '2026-03-01',
-    lastVisit: '2026-03-15',
-    status: 'active',
-  },
-  {
-    id: '7',
-    name: 'Isabel Torres',
-    email: 'isabel.torres@email.com',
-    phone: '+1 234 567 8906',
-    points: 0,
-    stamps: 0,
-    visits: 1,
-    totalSpent: 45,
-    joinDate: '2025-12-20',
-    lastVisit: '2026-01-05',
-    status: 'inactive',
-  },
-];
-
 export default function Customers() {
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'vip' | 'inactive'>('all');
+  const { data, loading, error } = useBusinessResource<Customer[]>('/business/customers', []);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const filtered = useMemo(() => data.filter((customer) => {
+    const term = search.toLowerCase();
+    return (status === 'all' || customer.status === status || customer.tier === status) &&
+      (customer.name.toLowerCase().includes(term) || customer.email?.toLowerCase().includes(term));
+  }), [data, search, status]);
 
-  const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          customer.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || customer.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  function exportCsv() {
+    const rows = [['Nombre', 'Email', 'Teléfono', 'Puntos', 'Sellos', 'Visitas', 'Gastado BOB'], ...filtered.map((c) => [c.name, c.email ?? '', c.phone ?? '', c.points, c.stamps, c.visits, (c.totalSpentMinor / 100).toFixed(2)])];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    link.download = 'clientes-yapita.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
 
-  const stats = {
-    total: customers.length,
-    active: customers.filter(c => c.status === 'active').length,
-    vip: customers.filter(c => c.status === 'vip').length,
-    totalPoints: customers.reduce((sum, c) => sum + c.points, 0),
-  };
-
+  const totalPoints = data.reduce((sum, item) => sum + item.points, 0);
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-gray-900">Clientes</h1>
-          <p className="mt-2 text-gray-600">Gestiona tu base de clientes</p>
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-          <Download className="w-5 h-5" />
-          Exportar
-        </button>
+      <div className="flex justify-between items-center"><div><h1 className="text-3xl">Clientes</h1><p className="mt-2 text-gray-600">Base consolidada desde PostgreSQL.</p></div><button onClick={exportCsv} className="flex gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg"><Download className="w-5 h-5" />Exportar CSV</button></div>
+      {error && <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg">{error}</div>}
+      <div className="grid sm:grid-cols-4 gap-4">
+        <div className="bg-white shadow rounded-lg p-5"><p className="text-2xl">{data.length}</p><p className="text-sm text-gray-500">Clientes</p></div>
+        <div className="bg-white shadow rounded-lg p-5"><TrendingUp className="text-green-600" /><p className="text-2xl">{data.filter((c) => c.status === 'active').length}</p><p className="text-sm text-gray-500">Activos</p></div>
+        <div className="bg-white shadow rounded-lg p-5"><Star className="text-purple-600" /><p className="text-2xl">{data.filter((c) => c.tier === 'vip').length}</p><p className="text-sm text-gray-500">VIP</p></div>
+        <div className="bg-white shadow rounded-lg p-5"><p className="text-2xl">{totalPoints.toLocaleString('es-BO')}</p><p className="text-sm text-gray-500">Puntos vigentes</p></div>
       </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">👥</span>
-            </div>
-            <div>
-              <p className="text-2xl text-gray-900">{stats.total}</p>
-              <p className="text-sm text-gray-600">Total Clientes</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl text-gray-900">{stats.active}</p>
-              <p className="text-sm text-gray-600">Activos</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Star className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-2xl text-gray-900">{stats.vip}</p>
-              <p className="text-sm text-gray-600">VIP</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🎯</span>
-            </div>
-            <div>
-              <p className="text-2xl text-gray-900">{stats.totalPoints}</p>
-              <p className="text-sm text-gray-600">Puntos Totales</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterStatus === 'all'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setFilterStatus('active')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterStatus === 'active'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Activos
-            </button>
-            <button
-              onClick={() => setFilterStatus('vip')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterStatus === 'vip'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              VIP
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Customers Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b flex gap-3"><div className="relative flex-1"><Search className="absolute w-4 h-4 left-3 top-3 text-gray-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" className="w-full border rounded-lg pl-9 pr-3 py-2" /></div><select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg px-3"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option><option value="vip">VIP</option></select></div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Contacto</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Puntos</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Sellos</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Visitas</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Gasto Total</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm text-gray-900">{customer.name}</div>
-                      <div className="text-xs text-gray-500">
-                        Desde {new Date(customer.joinDate).toLocaleDateString('es')}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm">
-                      <div className="flex items-center gap-1 text-gray-900">
-                        <Mail className="w-3 h-3" />
-                        <span className="text-xs">{customer.email}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-600 mt-1">
-                        <Phone className="w-3 h-3" />
-                        <span className="text-xs">{customer.phone}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{customer.points}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{customer.stamps}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{customer.visits}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">${customer.totalSpent}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 rounded-full ${
-                      customer.status === 'vip'
-                        ? 'bg-purple-100 text-purple-800'
-                        : customer.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {customer.status === 'vip' ? '⭐ VIP' : customer.status === 'active' ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+          <table className="w-full text-sm"><thead className="bg-gray-50 text-left"><tr><th className="p-4">Cliente</th><th className="p-4">Contacto</th><th className="p-4">Saldos</th><th className="p-4">Visitas</th><th className="p-4">Gastado</th><th className="p-4">Última visita</th></tr></thead>
+            <tbody>{loading ? <tr><td colSpan={6} className="p-6 text-gray-500">Cargando…</td></tr> : filtered.map((customer) => <tr key={customer.id} className="border-t"><td className="p-4"><strong>{customer.name}</strong><p className="text-xs text-gray-500">{customer.tier}</p></td><td className="p-4 text-gray-600"><p className="flex gap-1"><Mail className="w-3 h-3" />{customer.email || '—'}</p><p className="flex gap-1"><Phone className="w-3 h-3" />{customer.phone || '—'}</p></td><td className="p-4">{customer.points} pts · {customer.stamps} sellos</td><td className="p-4">{customer.visits}</td><td className="p-4">Bs {(customer.totalSpentMinor / 100).toFixed(2)}</td><td className="p-4">{customer.lastVisitAt ? new Date(customer.lastVisitAt).toLocaleDateString('es-BO') : '—'}</td></tr>)}</tbody>
           </table>
         </div>
-
-        {filteredCustomers.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No se encontraron clientes</p>
-          </div>
-        )}
       </div>
     </div>
   );

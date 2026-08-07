@@ -1,216 +1,78 @@
-import { useState } from 'react';
-import { Save, Upload, MapPin, Mail, Phone, Globe } from 'lucide-react';
+import { FormEvent, useEffect, useState } from 'react';
+import { Globe, Mail, MapPin, Phone, Save } from 'lucide-react';
+import { useAuth } from '../auth/AuthProvider';
+import { useBusinessResource } from '../lib/useBusinessResource';
+
+interface Profile {
+  displayName: string;
+  description: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  websiteUrl: string | null;
+  brandColor: string | null;
+  secondaryColor: string | null;
+  accentColor: string | null;
+  logoUrl: string | null;
+  locations: Array<{ id: string; addressLine: string; city: string | null }>;
+}
+
+const empty: Profile = { displayName: '', description: '', contactEmail: '', contactPhone: '', websiteUrl: '', brandColor: '#9333ea', secondaryColor: '#f59e0b', accentColor: '#10b981', logoUrl: '', locations: [] };
 
 export default function BusinessConfig() {
-  const [config, setConfig] = useState({
-    name: 'Mi Negocio',
-    description: 'Descripción de mi negocio',
-    address: 'Calle Principal 123, Ciudad',
-    phone: '+1 234 567 8900',
-    email: 'info@minegocio.com',
-    website: 'www.minegocio.com',
-    primaryColor: '#9333ea',
-    secondaryColor: '#f59e0b',
-    accentColor: '#10b981',
-  });
+  const { assignment, request } = useAuth();
+  const resource = useBusinessResource<Profile>('/business/profile', empty);
+  const [form, setForm] = useState({ displayName: '', description: '', contactEmail: '', contactPhone: '', websiteUrl: '', brandColor: '#9333ea', secondaryColor: '#f59e0b', accentColor: '#10b981', logoUrl: '', addressLine: '', city: '' });
+  const [message, setMessage] = useState<string | null>(null);
 
-  const handleSave = () => {
-    // Mock save
-    alert('Configuración guardada exitosamente');
-  };
+  useEffect(() => {
+    const profile = resource.data;
+    setForm({
+      displayName: profile.displayName,
+      description: profile.description ?? '',
+      contactEmail: profile.contactEmail ?? '',
+      contactPhone: profile.contactPhone ?? '',
+      websiteUrl: profile.websiteUrl ?? '',
+      brandColor: profile.brandColor ?? '#9333ea',
+      secondaryColor: profile.secondaryColor ?? '#f59e0b',
+      accentColor: profile.accentColor ?? '#10b981',
+      logoUrl: profile.logoUrl ?? '',
+      addressLine: profile.locations[0]?.addressLine ?? '',
+      city: profile.locations[0]?.city ?? '',
+    });
+  }, [resource.data]);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!assignment) return;
+    setMessage(null);
+    try {
+      await request('/business/profile', { method: 'PATCH', body: JSON.stringify({ assignmentId: assignment.id, ...form, websiteUrl: form.websiteUrl || undefined, logoUrl: form.logoUrl || undefined }) });
+      setMessage('Configuración guardada.');
+      await resource.refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : 'No se pudo guardar.');
+    }
+  }
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <div>
-        <h1 className="text-3xl text-gray-900">Configuración del Negocio</h1>
-        <p className="mt-2 text-gray-600">Personaliza la información y apariencia de tu negocio</p>
-      </div>
-
-      {/* Logo Upload */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg text-gray-900 mb-4">Logo del Negocio</h2>
-        <div className="flex items-center gap-6">
-          <div className="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-            <Upload className="w-8 h-8 text-gray-400" />
-          </div>
-          <div>
-            <button className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-              Subir Logo
-            </button>
-            <p className="mt-2 text-sm text-gray-500">PNG, JPG o SVG (máx. 2MB)</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Business Info */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg text-gray-900 mb-6">Información del Negocio</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Nombre del Negocio</label>
-            <input
-              type="text"
-              value={config.name}
-              onChange={(e) => setConfig({ ...config, name: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Descripción</label>
-            <textarea
-              value={config.description}
-              onChange={(e) => setConfig({ ...config, description: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Contact Info */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg text-gray-900 mb-6">Información de Contacto</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              <MapPin className="w-4 h-4 inline mr-2" />
-              Dirección
-            </label>
-            <input
-              type="text"
-              value={config.address}
-              onChange={(e) => setConfig({ ...config, address: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">
-                <Phone className="w-4 h-4 inline mr-2" />
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                value={config.phone}
-                onChange={(e) => setConfig({ ...config, phone: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">
-                <Mail className="w-4 h-4 inline mr-2" />
-                Email
-              </label>
-              <input
-                type="email"
-                value={config.email}
-                onChange={(e) => setConfig({ ...config, email: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              <Globe className="w-4 h-4 inline mr-2" />
-              Sitio Web
-            </label>
-            <input
-              type="url"
-              value={config.website}
-              onChange={(e) => setConfig({ ...config, website: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Colors */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg text-gray-900 mb-6">Colores de la Marca</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Color Primario</label>
-            <div className="flex gap-3">
-              <input
-                type="color"
-                value={config.primaryColor}
-                onChange={(e) => setConfig({ ...config, primaryColor: e.target.value })}
-                className="h-12 w-16 rounded cursor-pointer"
-              />
-              <input
-                type="text"
-                value={config.primaryColor}
-                onChange={(e) => setConfig({ ...config, primaryColor: e.target.value })}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Color Secundario</label>
-            <div className="flex gap-3">
-              <input
-                type="color"
-                value={config.secondaryColor}
-                onChange={(e) => setConfig({ ...config, secondaryColor: e.target.value })}
-                className="h-12 w-16 rounded cursor-pointer"
-              />
-              <input
-                type="text"
-                value={config.secondaryColor}
-                onChange={(e) => setConfig({ ...config, secondaryColor: e.target.value })}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Color de Acento</label>
-            <div className="flex gap-3">
-              <input
-                type="color"
-                value={config.accentColor}
-                onChange={(e) => setConfig({ ...config, accentColor: e.target.value })}
-                className="h-12 w-16 rounded cursor-pointer"
-              />
-              <input
-                type="text"
-                value={config.accentColor}
-                onChange={(e) => setConfig({ ...config, accentColor: e.target.value })}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-        </div>
-        
-        {/* Color Preview */}
-        <div className="mt-6 p-6 rounded-lg border-2 border-gray-200">
-          <p className="text-sm text-gray-600 mb-4">Vista Previa de Colores</p>
-          <div className="flex gap-4">
-            <div 
-              className="h-20 w-20 rounded-lg shadow-lg" 
-              style={{ backgroundColor: config.primaryColor }}
-            />
-            <div 
-              className="h-20 w-20 rounded-lg shadow-lg" 
-              style={{ backgroundColor: config.secondaryColor }}
-            />
-            <div 
-              className="h-20 w-20 rounded-lg shadow-lg" 
-              style={{ backgroundColor: config.accentColor }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-        >
-          <Save className="w-5 h-5" />
-          Guardar Configuración
-        </button>
-      </div>
-    </div>
+    <form onSubmit={save} className="max-w-4xl space-y-7">
+      <div><h1 className="text-3xl">Configuración del negocio</h1><p className="mt-2 text-gray-600">Información que verán los consumidores.</p></div>
+      {(resource.error || message) && <div className={`p-4 rounded-lg border ${resource.error || message !== 'Configuración guardada.' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{resource.error || message}</div>}
+      <section className="bg-white rounded-lg shadow p-6 space-y-4">
+        <h2 className="text-lg">Identidad</h2>
+        <label className="block text-sm">Nombre<input required value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label>
+        <label className="block text-sm">Descripción<textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label>
+        <label className="block text-sm">URL del logo<input type="url" value={form.logoUrl} onChange={(e) => setForm({ ...form, logoUrl: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" placeholder="https://…" /></label>
+      </section>
+      <section className="bg-white rounded-lg shadow p-6 space-y-4">
+        <h2 className="text-lg">Contacto y sucursal principal</h2>
+        <label className="block text-sm"><MapPin className="inline w-4 h-4 mr-2" />Dirección<input value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label>
+        <label className="block text-sm">Ciudad<input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label>
+        <div className="grid sm:grid-cols-2 gap-4"><label className="text-sm"><Phone className="inline w-4 h-4 mr-2" />Teléfono<input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label><label className="text-sm"><Mail className="inline w-4 h-4 mr-2" />Email<input type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label></div>
+        <label className="block text-sm"><Globe className="inline w-4 h-4 mr-2" />Sitio web<input type="url" value={form.websiteUrl} onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" placeholder="https://…" /></label>
+      </section>
+      <section className="bg-white rounded-lg shadow p-6"><h2 className="text-lg mb-4">Colores de marca</h2><div className="grid sm:grid-cols-3 gap-5">{([['brandColor', 'Primario'], ['secondaryColor', 'Secundario'], ['accentColor', 'Acento']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<div className="flex gap-2 mt-2"><input type="color" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="h-10 w-14" /><input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="w-full border rounded-lg px-3" /></div></label>)}</div></section>
+      <button className="flex gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-lg"><Save className="w-5 h-5" />Guardar cambios</button>
+    </form>
   );
 }

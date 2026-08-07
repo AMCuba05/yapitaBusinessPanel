@@ -1,321 +1,118 @@
-import { useState } from 'react';
-import { Plus, Edit, Trash2, Calendar, Percent, Eye, EyeOff } from 'lucide-react';
-
-interface Promotion {
-  id: string;
-  title: string;
-  description: string;
-  type: 'discount' | '2x1' | 'points' | 'free';
-  value: string;
-  startDate: string;
-  endDate: string;
-  active: boolean;
-  color: string;
-}
-
-const mockPromotions: Promotion[] = [
-  {
-    id: '1',
-    title: '¡2x1 en cafés esta semana!',
-    description: 'Compra un café y llévate otro gratis. Válido hasta el domingo.',
-    type: '2x1',
-    value: '2x1',
-    startDate: '2026-03-25',
-    endDate: '2026-03-31',
-    active: true,
-    color: '#f59e0b',
-  },
-  {
-    id: '2',
-    title: '¡Ganaste 50 puntos!',
-    description: 'Gracias por tu compra en Pollos Copacabana.',
-    type: 'points',
-    value: '50',
-    startDate: '2026-03-20',
-    endDate: '2026-04-05',
-    active: true,
-    color: '#10b981',
-  },
-  {
-    id: '3',
-    title: '30% en tickets de cine',
-    description: 'Aprovecha este descuento especial para funciones de lunes a jueves.',
-    type: 'discount',
-    value: '30',
-    startDate: '2026-03-15',
-    endDate: '2026-04-15',
-    active: true,
-    color: '#8b5cf6',
-  },
-  {
-    id: '4',
-    title: 'Happy Hour en Paprika',
-    description: '2x1 en bebidas de 5pm a 7pm todos los días.',
-    type: '2x1',
-    value: '2x1',
-    startDate: '2026-03-01',
-    endDate: '2026-03-31',
-    active: false,
-    color: '#ef4444',
-  },
-];
-
-const promotionTypes = [
-  { value: 'discount', label: 'Descuento %', icon: Percent },
-  { value: '2x1', label: '2x1', icon: Plus },
-  { value: 'points', label: 'Puntos Extra', icon: Plus },
-  { value: 'free', label: 'Gratis', icon: Plus },
-];
+import { FormEvent, useState } from 'react';
+import { Edit, Eye, EyeOff, Megaphone, Plus, Trash2 } from 'lucide-react';
+import { useAuth } from '../auth/AuthProvider';
+import { assignmentQuery } from '../lib/api';
+import { useBusinessResource } from '../lib/useBusinessResource';
+import type { Program, Promotion } from '../types/api';
 
 export default function Promotions() {
-  const [promotions, setPromotions] = useState<Promotion[]>(mockPromotions);
-  const [showModal, setShowModal] = useState(false);
-  const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+  const { assignment, request } = useAuth();
+  const resource = useBusinessResource<Promotion[]>('/business/promotions', []);
+  const programs = useBusinessResource<Program[]>('/business/programs', []);
+  const [editing, setEditing] = useState<Promotion | null>(null);
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: '', description: '', kind: 'bonus_units', programId: '', mode: 'fixed', amount: 2, color: '#9333ea', validFrom: '', validUntil: '' });
 
-  const handleToggleActive = (id: string) => {
-    setPromotions(promotions.map(promo => 
-      promo.id === id ? { ...promo, active: !promo.active } : promo
-    ));
-  };
+  function open(promotion?: Promotion) {
+    setEditing(promotion ?? null);
+    setForm({
+      title: promotion?.title ?? '',
+      description: promotion?.description ?? '',
+      kind: promotion?.promotionType ?? 'bonus_units',
+      programId: promotion?.bonus?.programId ?? programs.data[0]?.id ?? '',
+      mode: promotion?.bonus?.mode ?? 'fixed',
+      amount: promotion?.bonus?.mode === 'multiplier' ? promotion.bonus.multiplier ?? 2 : promotion?.bonus?.units ?? promotion?.discountPercent ?? 2,
+      color: promotion?.displayColor ?? '#9333ea',
+      validFrom: promotion?.validFrom?.slice(0, 16) ?? '',
+      validUntil: promotion?.validUntil?.slice(0, 16) ?? '',
+    });
+    setShow(true);
+  }
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de eliminar esta promoción?')) {
-      setPromotions(promotions.filter(promo => promo.id !== id));
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!assignment) return;
+    const isBonus = form.kind === 'bonus_units';
+    setError(null);
+    try {
+      await request(`/business/promotions${editing ? `/${editing.id}` : ''}`, {
+        method: editing ? 'PATCH' : 'POST',
+        body: JSON.stringify({
+          assignmentId: assignment.id,
+          title: form.title,
+          description: form.description,
+          promotionType: form.kind,
+          channel: 'loyalty',
+          status: editing?.status ?? 'active',
+          displayColor: form.color,
+          validFrom: form.validFrom || undefined,
+          validUntil: form.validUntil || undefined,
+          discountPercent: form.kind === 'discount_percent' ? form.amount : undefined,
+          bonus: isBonus ? {
+            programId: form.programId,
+            mode: form.mode,
+            units: form.mode === 'fixed' ? form.amount : undefined,
+            multiplier: form.mode === 'multiplier' ? form.amount : undefined,
+          } : undefined,
+        }),
+      });
+      setShow(false);
+      await resource.refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo guardar.');
     }
-  };
+  }
 
-  const handleCreate = () => {
-    setEditingPromo(null);
-    setShowModal(true);
-  };
+  async function toggle(promotion: Promotion) {
+    if (!assignment) return;
+    await request(`/business/promotions/${promotion.id}`, { method: 'PATCH', body: JSON.stringify({ assignmentId: assignment.id, status: promotion.status === 'active' ? 'paused' : 'active' }) });
+    await resource.refresh();
+  }
 
-  const handleEdit = (promo: Promotion) => {
-    setEditingPromo(promo);
-    setShowModal(true);
-  };
-
-  const getPromotionIcon = (type: string) => {
-    if (type === 'discount') return '%';
-    if (type === '2x1') return '2x1';
-    if (type === 'points') return '+' + 'pts';
-    return '🎁';
-  };
+  async function archive(promotion: Promotion) {
+    if (!assignment || !confirm(`¿Archivar ${promotion.title}?`)) return;
+    await request(`/business/promotions/${promotion.id}?${assignmentQuery(assignment.id)}`, { method: 'DELETE' });
+    await resource.refresh();
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-gray-900">Promociones</h1>
-          <p className="mt-2 text-gray-600">Crea ofertas especiales para tus clientes</p>
-        </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Nueva Promoción
-        </button>
+      <div className="flex justify-between items-center">
+        <div><h1 className="text-3xl">Promociones</h1><p className="mt-2 text-gray-600">Bonos configurables para programas de puntos o sellos.</p></div>
+        <button onClick={() => open()} className="flex gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg"><Plus className="w-5 h-5" />Nueva promoción</button>
       </div>
-
-      {/* Promotions List */}
+      {(error || resource.error) && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">{error || resource.error}</div>}
       <div className="space-y-4">
-        {promotions.map((promo) => (
-          <div
-            key={promo.id}
-            className="bg-white rounded-lg shadow overflow-hidden"
-          >
-            <div className="flex flex-col lg:flex-row">
-              {/* Color Bar & Icon */}
-              <div
-                className="w-full lg:w-24 h-24 lg:h-auto flex items-center justify-center text-white"
-                style={{ backgroundColor: promo.color }}
-              >
-                <span className="text-2xl">{getPromotionIcon(promo.type)}</span>
+        {resource.data.map((promotion) => (
+          <article key={promotion.id} className="bg-white rounded-lg shadow p-6 flex gap-5">
+            <div className="w-14 h-14 rounded-lg grid place-items-center text-white shrink-0" style={{ backgroundColor: promotion.displayColor ?? '#9333ea' }}><Megaphone /></div>
+            <div className="flex-1">
+              <div className="flex justify-between"><div><h2 className="text-lg">{promotion.title}</h2><p className="text-sm text-gray-600">{promotion.description}</p></div><span className="text-xs bg-gray-100 px-2 py-1 rounded h-fit">{promotion.status}</span></div>
+              <div className="mt-3 text-sm">
+                {promotion.bonus ? <strong>{promotion.bonus.mode === 'fixed' ? `+${promotion.bonus.units}` : `x${promotion.bonus.multiplier}`} {promotion.bonus.unitType === 'points' ? 'puntos' : 'sellos'} · {promotion.bonus.programName}</strong> : promotion.discountPercent != null ? <strong>{promotion.discountPercent}% de descuento</strong> : <span>{promotion.promotionType}</span>}
+                <p className="text-gray-500 mt-1">{promotion.redemptions} aplicaciones</p>
               </div>
-
-              {/* Content */}
-              <div className="flex-1 p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg text-gray-900">{promo.title}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs ${
-                        promo.active 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {promo.active ? 'Activa' : 'Inactiva'}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-600">{promo.description}</p>
-                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {new Date(promo.startDate).toLocaleDateString('es')} - {new Date(promo.endDate).toLocaleDateString('es')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 ml-4">
-                    <button
-                      onClick={() => handleToggleActive(promo.id)}
-                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      title={promo.active ? 'Desactivar' : 'Activar'}
-                    >
-                      {promo.active ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleEdit(promo)}
-                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      title="Editar"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(promo.id)}
-                      className="p-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <div className="flex gap-2 mt-4"><button onClick={() => void toggle(promotion)} className="p-2 border rounded">{promotion.status === 'active' ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button><button onClick={() => open(promotion)} className="p-2 border rounded"><Edit className="w-4 h-4" /></button><button onClick={() => void archive(promotion)} className="p-2 border rounded text-red-600"><Trash2 className="w-4 h-4" /></button></div>
             </div>
-          </div>
+          </article>
         ))}
       </div>
-
-      {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/80">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl text-gray-900 mb-6">
-              {editingPromo ? 'Editar Promoción' : 'Nueva Promoción'}
-            </h2>
-            
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">Título de la Promoción</label>
-                <input
-                  type="text"
-                  placeholder="Ej: 2x1 en cafés esta semana"
-                  defaultValue={editingPromo?.title}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">Tipo de Promoción</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {promotionTypes.map((type) => (
-                    <button
-                      key={type.value}
-                      type="button"
-                      className="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-purple-500 transition-colors"
-                    >
-                      {type.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">Descripción</label>
-                <textarea
-                  placeholder="Describe los detalles de la promoción"
-                  rows={3}
-                  defaultValue={editingPromo?.description}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">Valor</label>
-                <input
-                  type="text"
-                  placeholder="Ej: 30 (para 30%), 2x1, 50 puntos, etc."
-                  defaultValue={editingPromo?.value}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">Fecha de Inicio</label>
-                  <input
-                    type="date"
-                    defaultValue={editingPromo?.startDate}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">Fecha de Fin</label>
-                  <input
-                    type="date"
-                    defaultValue={editingPromo?.endDate}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">Color</label>
-                <div className="flex gap-3">
-                  <input
-                    type="color"
-                    defaultValue={editingPromo?.color || '#9333ea'}
-                    className="h-12 w-16 rounded cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    defaultValue={editingPromo?.color || '#9333ea'}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                <input
-                  type="checkbox"
-                  id="active"
-                  defaultChecked={editingPromo?.active ?? true}
-                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                />
-                <label htmlFor="active" className="text-sm text-gray-700">
-                  Activar promoción inmediatamente
-                </label>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Promoción guardada');
-                    setShowModal(false);
-                  }}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  {editingPromo ? 'Guardar Cambios' : 'Crear Promoción'}
-                </button>
-              </div>
-            </form>
-          </div>
+      {show && (
+        <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4">
+          <form onSubmit={save} className="bg-white rounded-xl p-6 w-full max-w-lg space-y-4">
+            <h2 className="text-xl">{editing ? 'Editar promoción' : 'Nueva promoción'}</h2>
+            <input required placeholder="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full border rounded-lg px-3 py-2" />
+            <textarea placeholder="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2" />
+            <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} className="w-full border rounded-lg px-3 py-2"><option value="bonus_units">Bono de puntos o sellos</option><option value="discount_percent">Descuento porcentual</option><option value="buy_x_get_y">Compra X, recibe Y</option><option value="free_item">Producto gratis</option></select>
+            {form.kind === 'bonus_units' && <>
+              <select required value={form.programId} onChange={(e) => setForm({ ...form, programId: e.target.value })} className="w-full border rounded-lg px-3 py-2"><option value="">Selecciona programa</option>{programs.data.map((program) => <option key={program.id} value={program.id}>{program.name} · {program.programType === 'points' ? 'puntos' : 'sellos'}</option>)}</select>
+              <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })} className="w-full border rounded-lg px-3 py-2"><option value="fixed">Cantidad adicional fija</option><option value="multiplier">Multiplicador</option></select>
+            </>}
+            {(form.kind === 'bonus_units' || form.kind === 'discount_percent') && <label className="block text-sm">{form.mode === 'multiplier' && form.kind === 'bonus_units' ? 'Multiplicador' : 'Cantidad'}<input type="number" min={form.mode === 'multiplier' ? 0.01 : 1} step={form.mode === 'multiplier' ? 0.01 : 1} value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} className="mt-1 w-full border rounded-lg px-3 py-2" /></label>}
+            <div className="grid grid-cols-2 gap-3"><label className="text-sm">Inicio<input type="datetime-local" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" /></label><label className="text-sm">Fin<input type="datetime-local" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" /></label></div>
+            <div className="flex justify-end gap-3"><button type="button" onClick={() => setShow(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button className="px-4 py-2 bg-purple-600 text-white rounded-lg">Guardar</button></div>
+          </form>
         </div>
       )}
     </div>
