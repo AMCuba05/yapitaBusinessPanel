@@ -5,6 +5,15 @@
 [build.environment]
   NODE_VERSION = "22.13.1"
 
+# Public browser configuration for the Yapita test environment.
+  VITE_API_BASE_URL = "https://yapita-backend-2f5h.onrender.com/api/v1"
+  VITE_FIREBASE_API_KEY = "AIzaSyApippvuOnpA3X0X_Is-39Kj6wDLzixF1w"
+  VITE_FIREBASE_AUTH_DOMAIN = "yapita-964b8.firebaseapp.com"
+  VITE_FIREBASE_PROJECT_ID = "yapita-964b8"
+  VITE_FIREBASE_STORAGE_BUCKET = "yapita-964b8.firebasestorage.app"
+  VITE_FIREBASE_MESSAGING_SENDER_ID = "932014024847"
+  VITE_FIREBASE_APP_ID = "1:932014024847:web:5e084b0483875c7716a8fa"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
