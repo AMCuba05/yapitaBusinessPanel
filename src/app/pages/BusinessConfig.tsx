@@ -1,7 +1,11 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { Globe, Mail, Phone, Save } from 'lucide-react';
-import { useAuth } from '../auth/AuthProvider';
-import { useBusinessResource } from '../lib/useBusinessResource';
+import { FormEvent, useEffect, useState } from "react";
+import { Globe, Mail, Phone, Save } from "lucide-react";
+import { useAuth } from "../auth/AuthProvider";
+import LogoPicker from "../components/LogoPicker";
+import { assignmentQuery } from "../lib/api";
+import { logoFormData } from "../lib/logoUpload";
+import { colorOptions } from "../lib/colorOptions";
+import { useBusinessResource } from "../lib/useBusinessResource";
 
 interface Location {
   id: string;
@@ -18,53 +22,100 @@ interface Profile {
   contactPhone: string | null;
   websiteUrl: string | null;
   brandColor: string | null;
-  secondaryColor: string | null;
-  accentColor: string | null;
   logoUrl: string | null;
   locations: Location[];
 }
 
-const empty: Profile = { displayName: '', description: '', contactEmail: '', contactPhone: '', websiteUrl: '', brandColor: '#9333ea', secondaryColor: '#f59e0b', accentColor: '#10b981', logoUrl: '', locations: [] };
+const empty: Profile = {
+  displayName: "",
+  description: "",
+  contactEmail: "",
+  contactPhone: "",
+  websiteUrl: "",
+  brandColor: "#9333ea",
+  logoUrl: "",
+  locations: [],
+};
 
 export default function BusinessConfig() {
   const { assignment, request } = useAuth();
-  const resource = useBusinessResource<Profile>('/business/profile', empty);
-  const [form, setForm] = useState({ displayName: '', description: '', contactEmail: '', contactPhone: '', websiteUrl: '', brandColor: '#9333ea', secondaryColor: '#f59e0b', accentColor: '#10b981', logoUrl: '' });
+  const resource = useBusinessResource<Profile>("/business/profile", empty);
+  const [form, setForm] = useState({
+    displayName: "",
+    description: "",
+    contactEmail: "",
+    contactPhone: "",
+    websiteUrl: "",
+    brandColor: "#9333ea",
+    logoUrl: "",
+  });
   const [location, setLocation] = useState<Location | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [savingLocation, setSavingLocation] = useState(false);
-  const canManage = !!assignment && ['owner', 'admin', 'manager'].includes(assignment.role);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const canManage =
+    !!assignment && ["owner", "admin", "manager"].includes(assignment.role);
+
   useEffect(() => {
+    setLogoFile(null);
+    setRemoveLogo(false);
+    setMessage(null);
     setLocation(null);
     setLocationError(null);
   }, [assignment?.id]);
-  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const profile = resource.data;
     setForm({
       displayName: profile.displayName,
-      description: profile.description ?? '',
-      contactEmail: profile.contactEmail ?? '',
-      contactPhone: profile.contactPhone ?? '',
-      websiteUrl: profile.websiteUrl ?? '',
-      brandColor: profile.brandColor ?? '#9333ea',
-      secondaryColor: profile.secondaryColor ?? '#f59e0b',
-      accentColor: profile.accentColor ?? '#10b981',
-      logoUrl: profile.logoUrl ?? '',
+      description: profile.description ?? "",
+      contactEmail: profile.contactEmail ?? "",
+      contactPhone: profile.contactPhone ?? "",
+      websiteUrl: profile.websiteUrl ?? "",
+      brandColor: profile.brandColor ?? "#9333ea",
+      logoUrl: profile.logoUrl ?? "",
     });
   }, [resource.data]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!assignment) return;
+    if (!assignment || saving || !canManage) return;
     setMessage(null);
+    setSaving(true);
+    let profileSaved = false;
     try {
-      await request('/business/profile', { method: 'PATCH', body: JSON.stringify({ assignmentId: assignment.id, ...form, websiteUrl: form.websiteUrl || undefined, logoUrl: form.logoUrl || undefined }) });
-      setMessage('Configuración guardada.');
+      const { logoUrl: _logoUrl, ...profile } = form;
+      await request("/business/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          assignmentId: assignment.id,
+          ...profile,
+          websiteUrl: form.websiteUrl || undefined,
+        }),
+      });
+      profileSaved = true;
+      const path = `/business/profile/logo?${assignmentQuery(assignment.id)}`;
+      if (logoFile)
+        await request(path, { method: "POST", body: logoFormData(logoFile) });
+      else if (removeLogo) await request(path, { method: "DELETE" });
+      setLogoFile(null);
+      setRemoveLogo(false);
+      setMessage("Configuración guardada.");
       await resource.refresh();
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : 'No se pudo guardar.');
+      const detail =
+        reason instanceof Error ? reason.message : "No se pudo guardar.";
+      setMessage(
+        profileSaved
+          ? `Los datos se guardaron, pero el cambio de logo está pendiente. ${detail} Puedes volver a guardar para reintentarlo.`
+          : detail,
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -97,21 +148,155 @@ export default function BusinessConfig() {
   return (
     <div className="max-w-4xl space-y-7">
     <form onSubmit={save} className="max-w-4xl space-y-7">
-      <div><h1 className="text-3xl">Configuración del negocio</h1><p className="mt-2 text-gray-600">Información que verán los consumidores.</p></div>
-      {(resource.error || message) && <div className={`p-4 rounded-lg border ${resource.error || message !== 'Configuración guardada.' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{resource.error || message}</div>}
-      <section className="bg-white rounded-lg shadow p-6 space-y-4">
-        <h2 className="text-lg">Identidad</h2>
-        <label className="block text-sm">Nombre<input required value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label>
-        <label className="block text-sm">Descripción<textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label>
-        <label className="block text-sm">URL del logo<input type="url" value={form.logoUrl} onChange={(e) => setForm({ ...form, logoUrl: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" placeholder="https://…" /></label>
-      </section>
-      <section className="bg-white rounded-lg shadow p-6 space-y-4">
-        <h2 className="text-lg">Contacto</h2>
-        <div className="grid sm:grid-cols-2 gap-4"><label className="text-sm"><Phone className="inline w-4 h-4 mr-2" />Teléfono<input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label><label className="text-sm"><Mail className="inline w-4 h-4 mr-2" />Email<input type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" /></label></div>
-        <label className="block text-sm"><Globe className="inline w-4 h-4 mr-2" />Sitio web<input type="url" value={form.websiteUrl} onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} className="mt-2 w-full border rounded-lg px-4 py-2" placeholder="https://…" /></label>
-      </section>
-      <section className="bg-white rounded-lg shadow p-6"><h2 className="text-lg mb-4">Colores de marca</h2><div className="grid sm:grid-cols-3 gap-5">{([['brandColor', 'Primario'], ['secondaryColor', 'Secundario'], ['accentColor', 'Acento']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<div className="flex gap-2 mt-2"><input type="color" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="h-10 w-14" /><input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="w-full border rounded-lg px-3" /></div></label>)}</div></section>
-      <button className="flex gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-lg"><Save className="w-5 h-5" />Guardar cambios</button>
+      <div>
+        <h1 className="text-3xl">Configuración del negocio</h1>
+        <p className="mt-2 text-gray-600">
+          Información que verán los consumidores.
+        </p>
+      </div>
+      {(resource.error || message) && (
+        <div
+          className={`p-4 rounded-lg border ${resource.error || message !== "Configuración guardada." ? "bg-red-50 border-red-200 text-red-700" : "bg-green-50 border-green-200 text-green-700"}`}
+        >
+          {resource.error || message}
+        </div>
+      )}
+      <fieldset
+        disabled={saving || resource.loading || !!resource.error || !canManage}
+        className="space-y-7"
+      >
+        <section className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h2 className="text-lg">Identidad</h2>
+          <label className="block text-sm">
+            Nombre
+            <input
+              required
+              value={form.displayName}
+              onChange={(e) =>
+                setForm({ ...form, displayName: e.target.value })
+              }
+              className="mt-2 w-full border rounded-lg px-4 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            Descripción
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              className="mt-2 w-full border rounded-lg px-4 py-2"
+            />
+          </label>
+          <LogoPicker
+            value={logoFile}
+            currentUrl={form.logoUrl}
+            removed={removeLogo}
+            disabled={saving || !canManage}
+            onChange={(file) => {
+              setLogoFile(file);
+              setRemoveLogo(false);
+            }}
+            onRemove={() => {
+              setRemoveLogo(true);
+              setLogoFile(null);
+            }}
+          />
+          {removeLogo && (
+            <p className="text-sm text-gray-500">
+              El logo se eliminará al guardar los cambios.
+            </p>
+          )}
+        </section>
+        <section className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h2 className="text-lg">Contacto</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="text-sm">
+              <Phone className="inline w-4 h-4 mr-2" />
+              Teléfono
+              <input
+                value={form.contactPhone}
+                onChange={(e) =>
+                  setForm({ ...form, contactPhone: e.target.value })
+                }
+                className="mt-2 w-full border rounded-lg px-4 py-2"
+              />
+            </label>
+            <label className="text-sm">
+              <Mail className="inline w-4 h-4 mr-2" />
+              Email
+              <input
+                type="email"
+                value={form.contactEmail}
+                onChange={(e) =>
+                  setForm({ ...form, contactEmail: e.target.value })
+                }
+                className="mt-2 w-full border rounded-lg px-4 py-2"
+              />
+            </label>
+          </div>
+          <label className="block text-sm">
+            <Globe className="inline w-4 h-4 mr-2" />
+            Sitio web
+            <input
+              type="url"
+              value={form.websiteUrl}
+              onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })}
+              className="mt-2 w-full border rounded-lg px-4 py-2"
+              placeholder="https://…"
+            />
+          </label>
+        </section>
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg mb-4">Color de marca</h2>
+          <label className="block max-w-md text-sm">
+            Primario
+            <div className="mt-2 flex items-center gap-3">
+              <span
+                className="h-9 w-9 shrink-0 rounded-lg border border-black/10 shadow-sm"
+                style={{ backgroundColor: form.brandColor }}
+                aria-hidden="true"
+              />
+              <select
+                value={form.brandColor}
+                onChange={(e) =>
+                  setForm({ ...form, brandColor: e.target.value })
+                }
+                className="w-full rounded-lg border px-3 py-2"
+              >
+                {!colorOptions.some(
+                  (option) => option.value === form.brandColor,
+                ) && <option value={form.brandColor}>Color anterior</option>}
+                {colorOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span className="mt-1 block text-xs text-gray-500">
+              Elige uno de los colores disponibles para mantener buena
+              legibilidad en la app.
+            </span>
+          </label>
+        </section>
+        {!canManage && (
+          <p className="text-sm text-gray-500">
+            Solo el propietario, administrador o gerente puede editar el
+            negocio.
+          </p>
+        )}
+        <button
+          disabled={
+            saving || resource.loading || !!resource.error || !canManage
+          }
+          className="flex gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-lg"
+        >
+          <Save className="w-5 h-5" />
+          {saving ? "Guardando cambios…" : "Guardar cambios"}
+        </button>
+      </fieldset>
     </form>
     <section className="bg-white rounded-lg shadow p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

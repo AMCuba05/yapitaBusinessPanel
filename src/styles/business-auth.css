@@ -1,0 +1,200 @@
+/* Login follows the product admin layout; selectors are scoped to this page. */
+.business-auth-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  background: #fff;
+  color: #17141f;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+.business-auth-brand {
+  padding: clamp(48px, 8vw, 110px);
+  color: #fff;
+  background:
+    radial-gradient(
+      circle at 15% 15%,
+      rgba(167, 139, 250, 0.5),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgba(236, 72, 153, 0.24),
+      transparent 30%
+    ),
+    linear-gradient(145deg, #2e1065, #5b21b6 60%, #7e22ce);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.business-auth-mark {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 15px;
+  background: #fff;
+  color: #6d28d9;
+  font:
+    800 28px "Manrope",
+    sans-serif;
+  display: grid;
+  place-items: center;
+  margin-bottom: 42px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+.business-auth-eyebrow {
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin: 0 0 8px;
+}
+.business-auth-brand .business-auth-eyebrow {
+  color: #ddd6fe;
+}
+.business-auth-brand h1 {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: clamp(38px, 5vw, 64px);
+  max-width: 720px;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  margin: 0 0 24px;
+}
+.business-auth-brand > p:not(.business-auth-eyebrow) {
+  max-width: 600px;
+  color: #ddd6fe;
+  font-size: 18px;
+  line-height: 1.65;
+  margin: 0 0 16px;
+}
+.business-auth-security {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 36px;
+  color: #ede9fe;
+  font-size: 14px;
+}
+.business-auth-security svg {
+  flex-shrink: 0;
+}
+.business-auth-panel {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 32px;
+}
+.business-auth-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 20px;
+}
+.business-auth-card h2 {
+  font-family: "Manrope", sans-serif;
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.business-auth-muted {
+  color: #706b7a;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.business-auth-card fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 20px;
+}
+.business-auth-card label {
+  color: #413b49;
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  gap: 7px;
+}
+.business-auth-card input {
+  width: 100%;
+  color: #231f29;
+  background: #fff;
+  border: 1px solid #dcd8e3;
+  border-radius: 9px;
+  padding: 11px 12px;
+  outline: none;
+  font: inherit;
+}
+.business-auth-card input::placeholder {
+  color: #9b95a3;
+  font-weight: 400;
+}
+.business-auth-card input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+.business-auth-primary {
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  box-shadow: 0 8px 22px rgba(109, 40, 217, 0.2);
+  cursor: pointer;
+}
+.business-auth-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.business-auth-primary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.business-auth-text-button {
+  border: 0;
+  background: transparent;
+  color: #6d28d9;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.business-auth-card button:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 4px;
+}
+.business-auth-alert {
+  padding: 13px 15px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.business-auth-alert.error {
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+.business-auth-alert.success {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+@media (max-width: 850px) {
+  .business-auth-page {
+    grid-template-columns: 1fr;
+  }
+  .business-auth-brand {
+    display: none;
+  }
+}
+@media (max-width: 400px) {
+  .business-auth-panel {
+    padding: 24px;
+  }
+}

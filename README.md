@@ -39,6 +39,7 @@ asignación seleccionada. Las pantallas consumen:
 
 - `GET /business/dashboard`
 - `GET|PATCH /business/profile`
+- `POST|DELETE /business/profile/logo?assignmentId=<UUID>`
 - CRUD `/business/programs`
 - CRUD `/business/rewards`
 - CRUD `/business/promotions`
@@ -54,3 +55,9 @@ obtiene del programa (`points` o `stamps`) y su modalidad es `fixed` o
 Define las variables `VITE_*` durante el build y usa HTTPS para
 `VITE_API_BASE_URL`. No copies el JSON de la cuenta de servicio a este
 repositorio: esa credencial pertenece únicamente al backend.
+
+## Logos
+
+Configuración permite seleccionar, previsualizar, reemplazar y eliminar el logo al guardar. Acepta PNG, JPEG y WebP hasta 2 MB; el backend valida hasta 4096 × 4096 píxeles y convierte a WebP. Solo owner, admin y manager pueden modificarlo.
+
+Las subidas usan multipart autenticado al backend, que necesita ImageKit configurado y la migración de media aplicada. No se requieren claves ImageKit en este panel. Si el perfil se guarda y el logo falla, se conserva la selección para reintentar y se informa el resultado parcial.

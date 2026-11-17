@@ -18,6 +18,7 @@ import {
 } from 'react';
 import { apiRequest } from '../lib/api';
 import { firebaseAuth } from '../lib/firebase';
+import { invalidateBusinessResourceCache } from '../lib/resourceCache';
 import type { BusinessAssignment, BusinessSession } from '../types/api';
 
 interface AuthContextValue {
@@ -154,15 +155,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async logout() {
         localStorage.removeItem(ASSIGNMENT_KEY);
+        invalidateBusinessResourceCache();
         await signOut(firebaseAuth);
       },
       selectAssignment(id) {
         setAssignmentId(id);
         localStorage.setItem(ASSIGNMENT_KEY, id);
       },
-      request<T>(path: string, init?: RequestInit) {
+      async request<T>(path: string, init?: RequestInit) {
         if (!firebaseUser) return Promise.reject(new Error('Sesión no disponible.'));
-        return apiRequest<T>(firebaseUser, path, init);
+        const result = await apiRequest<T>(firebaseUser, path, init);
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD') {
+          invalidateBusinessResourceCache(assignment?.id);
+        }
+        return result;
       },
     }),
     [assignment, error, firebaseUser, link, loading, profile],

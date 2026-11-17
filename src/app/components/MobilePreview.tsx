@@ -1,6 +1,5 @@
 import { Award, CalendarDays, Sparkles, Star, Tag } from 'lucide-react';
-
-type ProgramType = 'points' | 'stamps';
+import type { EarningMethod, ProgramType } from '../types/api';
 
 interface PreviewShellProps {
   children: React.ReactNode;
@@ -30,27 +29,40 @@ function programLabel(type: ProgramType) {
 
 export interface ProgramPreviewProps {
   businessName: string;
+  businessLogoUrl?: string;
   name: string;
   programType: ProgramType;
   goal: number;
   color: string;
   minimumPurchaseBs: string;
   validUntil: string;
+  earningMethod: EarningMethod;
+  spendAmountBs: string;
+  awardUnits: string;
 }
 
 export function ProgramPreview({
   businessName,
+  businessLogoUrl,
   name,
   programType,
   goal,
   color,
   minimumPurchaseBs,
   validUntil,
+  earningMethod,
+  spendAmountBs,
+  awardUnits,
 }: ProgramPreviewProps) {
   const Icon = programType === 'points' ? Star : Tag;
   const expiration = validUntil
     ? new Date(`${validUntil}T12:00:00`).toLocaleDateString('es-BO')
     : null;
+  const earningText = earningMethod === 'spend_conversion'
+    ? `${awardUnits || '0'} por cada Bs ${spendAmountBs || '0'}`
+    : earningMethod === 'fixed_per_visit'
+      ? `${awardUnits || '0'} por visita`
+      : 'Acreditación manual';
 
   return (
     <PreviewShell eyebrow="Así verá el cliente su tarjeta en Yapita">
@@ -70,7 +82,9 @@ export function ProgramPreview({
                 className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-xl text-white"
                 style={{ backgroundColor: color }}
               >
-                {programType === 'points' ? '⭐' : '🎟️'}
+                {businessLogoUrl ? (
+                  <img src={businessLogoUrl} alt="" className="h-full w-full rounded-2xl object-cover" />
+                ) : programType === 'points' ? '⭐' : '🎟️'}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-white">
@@ -78,6 +92,9 @@ export function ProgramPreview({
                 </p>
                 <p className="truncate text-xs text-gray-400">
                   {name || 'Nombre del programa'}
+                </p>
+                <p className="mt-1 truncate text-[11px] text-gray-500">
+                  {earningText}
                 </p>
               </div>
             </div>

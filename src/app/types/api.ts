@@ -27,18 +27,21 @@ export interface BusinessSession {
   assignments: BusinessAssignment[];
 }
 
+export type ProgramType = 'points' | 'stamps';
+export type EarningMethod = 'spend_conversion' | 'fixed_per_visit' | 'manual';
+export type ProgramStatus = 'draft' | 'active' | 'paused' | 'ended';
+
 export interface Program {
   id: string;
   name: string;
-  programType: 'points' | 'stamps';
-  earningMethod: 'spend_conversion' | 'fixed_per_visit' | 'manual';
-  status: 'draft' | 'active' | 'paused' | 'ended';
+  programType: ProgramType;
+  earningMethod: EarningMethod;
+  status: ProgramStatus;
   spendAmountMinor: number | null;
   awardUnits: number | null;
   minimumPurchaseMinor: number | null;
   stampCycleSize: number | null;
   cardColor: string | null;
-  cardLogoUrl: string | null;
   validFrom: string | null;
   validUntil: string | null;
   terms: string | null;
@@ -50,6 +53,22 @@ export interface Program {
   } | null;
 }
 
+export interface ProgramMutation {
+  assignmentId: string;
+  name: string;
+  programType: ProgramType;
+  earningMethod: EarningMethod;
+  status: ProgramStatus;
+  spendAmountMinor?: number;
+  awardUnits?: number;
+  minimumPurchaseMinor?: number;
+  stampCycleSize?: number;
+  cardColor?: string;
+  validFrom?: string;
+  validUntil?: string;
+  terms?: string;
+}
+
 export interface Reward {
   id: string;
   title: string;
@@ -57,6 +76,7 @@ export interface Reward {
   icon: string | null;
   rewardType: string;
   status: string;
+  repeatable: boolean;
   stockQuantity: number | null;
   redemptions: number;
   costs: Array<{

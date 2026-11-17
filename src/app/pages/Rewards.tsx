@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Edit, Eye, EyeOff, Gift, Plus, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { assignmentQuery } from '../lib/api';
 import { useBusinessResource } from '../lib/useBusinessResource';
@@ -8,15 +9,16 @@ import { RewardPreview } from '../components/MobilePreview';
 
 export default function Rewards() {
   const { assignment, request } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const rewardsResource = useBusinessResource<Reward[]>('/business/rewards', []);
   const programsResource = useBusinessResource<Program[]>('/business/programs', []);
   const [editing, setEditing] = useState<Reward | null>(null);
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', icon: '🎁', rewardType: 'product', programId: '', requiredUnits: 100, stock: '' });
+  const [form, setForm] = useState({ title: '', description: '', icon: '🎁', rewardType: 'product', repeatable: true, programId: '', requiredUnits: 100, stock: '' });
   const selectedProgram = programsResource.data.find((program) => program.id === form.programId);
 
-  function open(reward?: Reward) {
+  function open(reward?: Reward, requestedProgramId?: string, requestedUnits?: number) {
     const cost = reward?.costs[0];
     setEditing(reward ?? null);
     setForm({
@@ -24,12 +26,26 @@ export default function Rewards() {
       description: reward?.description ?? '',
       icon: reward?.icon ?? '🎁',
       rewardType: reward?.rewardType ?? 'product',
-      programId: cost?.programId ?? programsResource.data[0]?.id ?? '',
-      requiredUnits: cost?.requiredUnits ?? 100,
+      repeatable: reward?.repeatable ?? true,
+      programId: cost?.programId ?? requestedProgramId ?? programsResource.data[0]?.id ?? '',
+      requiredUnits: cost?.requiredUnits ?? requestedUnits ?? 100,
       stock: reward?.stockQuantity == null ? '' : String(reward.stockQuantity),
     });
     setShow(true);
   }
+
+  const requestedProgramId = searchParams.get('programId');
+  const requestedUnits = Number(searchParams.get('requiredUnits'));
+
+  useEffect(() => {
+    if (!requestedProgramId || !programsResource.data.some(({ id }) => id === requestedProgramId)) return;
+    open(
+      undefined,
+      requestedProgramId,
+      Number.isInteger(requestedUnits) && requestedUnits > 0 ? requestedUnits : undefined,
+    );
+    setSearchParams({}, { replace: true });
+  }, [programsResource.data, requestedProgramId, requestedUnits, setSearchParams]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -45,6 +61,7 @@ export default function Rewards() {
           icon: form.icon,
           rewardType: form.rewardType,
           status: editing?.status ?? 'active',
+          repeatable: form.repeatable,
           stockQuantity: form.stock === '' ? undefined : Number(form.stock),
           costs: [{ programId: form.programId, requiredUnits: form.requiredUnits }],
         }),
@@ -105,6 +122,7 @@ export default function Rewards() {
                 <div className="grid grid-cols-[80px_1fr] gap-3"><input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="border rounded-lg px-3 py-2 text-center" aria-label="Icono de la recompensa" /><input required placeholder="Nombre" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="border rounded-lg px-3 py-2" /></div>
                 <textarea placeholder="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2" />
                 <select value={form.rewardType} onChange={(e) => setForm({ ...form, rewardType: e.target.value })} className="w-full border rounded-lg px-3 py-2"><option value="product">Producto</option><option value="discount">Descuento</option><option value="service">Servicio</option><option value="gift">Regalo</option></select>
+                <label className="flex items-center gap-3 rounded-lg border p-3 text-sm"><input type="checkbox" checked={form.repeatable} onChange={(e) => setForm({ ...form, repeatable: e.target.checked })} className="h-4 w-4 accent-purple-600" />La recompensa puede obtenerse más de una vez</label>
                 <select required value={form.programId} onChange={(e) => setForm({ ...form, programId: e.target.value })} className="w-full border rounded-lg px-3 py-2">{programsResource.data.map((program) => <option key={program.id} value={program.id}>{program.name} ({program.programType === 'points' ? 'puntos' : 'sellos'})</option>)}</select>
                 <div className="grid grid-cols-2 gap-3"><label className="text-sm">Costo<input type="number" min={1} value={form.requiredUnits} onChange={(e) => setForm({ ...form, requiredUnits: Number(e.target.value) })} className="mt-1 w-full border rounded-lg px-3 py-2" /></label><label className="text-sm">Stock (vacío = ilimitado)<input type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" /></label></div>
               </div>
